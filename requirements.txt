@@ -1,0 +1,15 @@
+# Core dependencies
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Supabase
+supabase==2.3.0
+
+# Data processing
+pandas==2.2.0
+
+# Scheduling (for local testing)
+schedule==1.2.0
+
+# Testing
+pytest==7.4.3
