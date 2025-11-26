@@ -45,7 +45,88 @@ class GitHubExtractor:
                 print(f" Warning: GitHub API returned status {response.status_code}")
         except Exception as e:
             print(f" Warning: Could not verify GitHub connection: {e}")
+
+    def get_org_repos(self) -> List[str]:
+        """
+        Get all repositories in the organization.
+
+        Returns:
+            List of repository names
+        """
+        print(f"  → Fetching repositories for organization: {self.org}...")
+
+        repos = []
+        page = 1
+
+        try:
+            while page <= 10:  # Limit to 10 pages (1000 repos max)
+                url = f"{self.base_url}/orgs/{self.org}/repos"
+                params = {
+                    "per_page": 100,
+                    "page": page,
+                    "type": "all"  # all, public, private, forks, sources, member
+                }
+
+                response = requests.get(
+                    url,
+                    headers=self.headers,
+                    params=params,
+                    timeout=10
+                )
+
+                if response.status_code != 200:
+                    # If org endpoint fails, try user repos
+                    url = f"{self.base_url}/users/{self.org}/repos"
+                    response = requests.get(
+                        url,
+                        headers=self.headers,
+                        params=params,
+                        timeout=10
+                    )
+
+                    if response.status_code != 200:
+                        print(f"  Warning: Could not fetch repos (status {response.status_code})")
+                        break
+
+                page_repos = response.json()
+
+                if not page_repos:
+                    break
+
+                for repo in page_repos:
+                    repos.append(repo["name"])
+
+                page += 1
+
+            print(f"  ✓ Found {len(repos)} repositories")
+            return repos
+
+        except Exception as e:
+            print(f"  Error fetching repositories: {e}")
+            return []
     
+    def get_all_commits(self, days_back: int = 30) -> List[Dict]:
+        """
+        Get commits from ALL repositories in the organization.
+
+        Args:
+            days_back: Number of days to look back
+
+        Returns:
+            List of commit dictionaries from all repos
+        """
+        print(f"  → Fetching commits from ALL repos in {self.org} (last {days_back} days)...")
+
+        repos = self.get_org_repos()
+        all_commits = []
+
+        for repo in repos:
+            repo_commits = self.get_commits(repo=repo, days_back=days_back)
+            all_commits.extend(repo_commits)
+
+        print(f"  ✓ Total commits across all repos: {len(all_commits)}")
+        return all_commits
+
     def get_commits(self, repo: str = "test-metrics-repo", days_back: int = 30) -> List[Dict]:
         """
         Get commits from repository.
@@ -115,6 +196,28 @@ class GitHubExtractor:
             print(f"  Error fetching commits: {e}")
             return []
     
+    def get_all_pull_requests(self, days_back: int = 30) -> List[Dict]:
+        """
+        Get pull requests from ALL repositories in the organization.
+
+        Args:
+            days_back: Number of days to look back
+
+        Returns:
+            List of PR dictionaries from all repos
+        """
+        print(f"  → Fetching PRs from ALL repos in {self.org} (last {days_back} days)...")
+
+        repos = self.get_org_repos()
+        all_prs = []
+
+        for repo in repos:
+            repo_prs = self.get_pull_requests(repo=repo, days_back=days_back)
+            all_prs.extend(repo_prs)
+
+        print(f"  ✓ Total PRs across all repos: {len(all_prs)}")
+        return all_prs
+
     def get_pull_requests(self, repo: str = "test-metrics-repo", days_back: int = 30) -> List[Dict]:
         """
         Get pull requests from repository.

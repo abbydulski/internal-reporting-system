@@ -133,27 +133,29 @@ class SupabaseLoader:
     def load_github_pull_requests(self, prs: List[Dict]) -> int:
         """Load GitHub pull requests into database."""
         print(f"  → Loading {len(prs)} GitHub PRs...")
-        
+
         if not prs:
             print("  ✓ No PRs to load")
             return 0
-        
+
         for pr in prs:
             pr["synced_at"] = datetime.now().isoformat()
-        
+
         try:
-            # Try upsert without on_conflict parameter
+            # Try bulk upsert with composite key (pr_number + repository)
             response = self.client.table("github_pull_requests").upsert(
-                prs
+                prs,
+                on_conflict="pr_number,repository"
             ).execute()
-            
+
             print(f"  ✓ Loaded {len(prs)} pull requests")
             return len(prs)
-            
+
         except Exception as e:
-            # If upsert fails, insert one by one
+            # If bulk upsert fails, try individual inserts
+            print(f"  ⚠ Bulk upsert failed: {str(e)[:80]}")
             print(f"  → Trying individual inserts...")
-            
+
             loaded = 0
             for pr in prs:
                 try:
@@ -168,9 +170,9 @@ class SupabaseLoader:
                             .eq("repository", pr["repository"])\
                             .execute()
                         loaded += 1
-                    except Exception:
-                        pass
-            
+                    except Exception as insert_error:
+                        print(f"  ⚠ Skipped PR #{pr.get('pr_number', 'unknown')}: {str(insert_error)[:60]}")
+
             print(f"  ✓ Loaded {loaded} pull requests")
             return loaded
     

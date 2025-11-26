@@ -6,7 +6,9 @@ Main orchestration script that runs the entire ETL pipeline.
 from datetime import datetime
 from etl.config import Config
 from etl.extractors.mercury_extractor import MercuryExtractor
-from etl.extractors.quickbooks_extractor import QuickBooksExtractor
+# from etl.extractors.quickbooks_extractor_MOCK import QuickBooksExtractor  # MOCK version
+from etl.extractors.quickbooks_extractor import QuickBooksExtractor  # REAL API version (requires OAuth)
+# from etl.extractors.quickbooks_csv_importer import QuickBooksCSVImporter as QuickBooksExtractor  # CSV version (no OAuth)
 from etl.extractors.github_extractor import GitHubExtractor
 from etl.loaders.supabase_loader import SupabaseLoader
 from etl.analytics.metrics_calculator import MetricsCalculator
@@ -24,13 +26,29 @@ def run_daily_sync():
     
     # Initialize components
     mercury = MercuryExtractor(Config.MERCURY_API_KEY)
+
+    # QuickBooks - REAL (using production data)
     quickbooks = QuickBooksExtractor(
         Config.QUICKBOOKS_CLIENT_ID,
         Config.QUICKBOOKS_CLIENT_SECRET,
         Config.QUICKBOOKS_REFRESH_TOKEN,
         Config.QUICKBOOKS_REALM_ID,
-        is_sandbox=True
+        is_sandbox=False  # Production mode
     )
+
+    # Alternative options (comment/uncomment as needed):
+
+    # MOCK version (fake data for testing):
+    # from etl.extractors.quickbooks_extractor_MOCK import QuickBooksExtractor
+    # quickbooks = QuickBooksExtractor("mock", "mock", "mock")
+
+    # CSV Import (no OAuth required):
+    # from etl.extractors.quickbooks_csv_importer import QuickBooksCSVImporter as QuickBooksExtractor
+    # quickbooks = QuickBooksExtractor(
+    #     invoices_csv="quickbooks_invoices.csv",
+    #     payments_csv="quickbooks_payments.csv"
+    # )
+
     github = GitHubExtractor(Config.GITHUB_TOKEN, Config.GITHUB_ORG)
     loader = SupabaseLoader(Config.SUPABASE_URL, Config.SUPABASE_KEY)
     
@@ -48,8 +66,14 @@ def run_daily_sync():
     
     # Extract GitHub data
     print("\nGitHub:")
-    gh_commits = github.get_commits(days_back=90)
-    gh_prs = github.get_pull_requests(days_back=90)
+    # Option 1: Track entire organization (all repos)
+    if Config.GITHUB_REPO == "ALL" or Config.GITHUB_REPO == "your-repo":
+        gh_commits = github.get_all_commits(days_back=90)
+        gh_prs = github.get_all_pull_requests(days_back=90)
+    # Option 2: Track specific repo only
+    else:
+        gh_commits = github.get_commits(repo=Config.GITHUB_REPO, days_back=90)
+        gh_prs = github.get_pull_requests(repo=Config.GITHUB_REPO, days_back=90)
     
     print("\n--- PHASE 2: LOAD ---")
     
@@ -78,7 +102,7 @@ def run_weekly_report():
     # Initialize components
     supabase_client = create_client(Config.SUPABASE_URL, Config.SUPABASE_KEY)
     calculator = MetricsCalculator(supabase_client)
-    reporter = SlackReporter(Config.SLACK_WEBHOOK_URL)
+    reporter = SlackReporter(Config.SLACK_WEBHOOK_URL, Config.SLACK_WEBHOOK_URL_2, Config.SLACK_WEBHOOK_URL_3)
     loader = SupabaseLoader(Config.SUPABASE_URL, Config.SUPABASE_KEY)
     
     # Calculate metrics

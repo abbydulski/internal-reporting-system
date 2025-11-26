@@ -28,9 +28,12 @@ class Config:
     # GitHub API
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "mock_token")
     GITHUB_ORG = os.getenv("GITHUB_ORG", "your-org")
+    GITHUB_REPO = os.getenv("GITHUB_REPO", "your-repo")
     
     # Slack
     SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+    SLACK_WEBHOOK_URL_2 = os.getenv("SLACK_WEBHOOK_URL_2", "")  # Optional second channel
+    SLACK_WEBHOOK_URL_3 = os.getenv("SLACK_WEBHOOK_URL_3", "")  # Optional third channel
     
     # Environment
     ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
